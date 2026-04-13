@@ -1,25 +1,23 @@
 FROM node:lts-alpine
 
-LABEL maintainer="TitaniumNetwork Ultraviolet Team"
-LABEL summary="Ultraviolet Proxy Image"
-LABEL description="Example application of Ultraviolet which can be deployed in production."
-
 ENV NODE_ENV=production
+ENV PORT=7860
 WORKDIR /app
 
+# Install build tools
 RUN apk add --upgrade --no-cache python3 make g++
 
-RUN npm install --global corepack@latest
+# Hugging Face needs port 7860
+EXPOSE 7860
 
+# Setup pnpm
+RUN npm install --global corepack@latest
 COPY package.json /app/package.json
 COPY pnpm-lock.yaml /app/pnpm-lock.yaml
-
-RUN corepack install
+RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN pnpm install
 
 COPY . /app
 
-EXPOSE 8080
-
-ENTRYPOINT [ "node" ]
-CMD ["src/index.js"]
+# Start the server
+CMD ["node", "src/index.js"]
