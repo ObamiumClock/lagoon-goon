@@ -3,24 +3,30 @@ import { hostname } from "node:os";
 import { createServer } from "node:http";
 import express from "express";
 import wisp from "wisp-server-node";
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 
 import { uvPath } from "@titaniumnetwork-dev/ultraviolet";
 import { epoxyPath } from "@mercuryworkshop/epoxy-transport";
 import { baremuxPath } from "@mercuryworkshop/bare-mux/node";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = join(dirname(__filename), '..'); 
+
 const app = express();
-// Load our publicPath first and prioritize it over UV.
-app.use(express.static("./public"));
-// Load vendor files last.
-// The vendor's uv.config.js won't conflict with our uv.config.js inside the publicPath directory.
+
+// Load your public files (index.html, etc)
+app.use(express.static(join(__dirname, 'public')));
+
+// Load Ultraviolet engine files
 app.use("/uv/", express.static(uvPath));
 app.use("/epoxy/", express.static(epoxyPath));
 app.use("/baremux/", express.static(baremuxPath));
 
-// Error for everything else
+// Fallback: If a user goes to a random link, send them back to index.html
 app.use((req, res) => {
 	res.status(404);
-	res.sendFile("./public/404.html");
+	res.sendFile(join(__dirname, 'public', 'index.html'));
 });
 
 const server = createServer();
@@ -30,6 +36,7 @@ server.on("request", (req, res) => {
 	res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
 	app(req, res);
 });
+
 server.on("upgrade", (req, socket, head) => {
 	if (req.url.endsWith("/wisp/")) {
 		wisp.routeRequest(req, socket, head);
@@ -39,25 +46,14 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 let port = parseInt(process.env.PORT || "");
-
 if (isNaN(port)) port = 8080;
 
 server.on("listening", () => {
 	const address = server.address();
-
-	// by default we are listening on 0.0.0.0 (every interface)
-	// we just need to list a few
 	console.log("Listening on:");
 	console.log(`\thttp://localhost:${address.port}`);
-	console.log(`\thttp://${hostname()}:${address.port}`);
-	console.log(
-		`\thttp://${
-			address.family === "IPv6" ? `[${address.address}]` : address.address
-		}:${address.port}`
-	);
 });
 
-// https://expressjs.com/en/advanced/healthcheck-graceful-shutdown.html
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
